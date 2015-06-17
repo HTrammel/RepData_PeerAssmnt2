@@ -37,6 +37,8 @@ dataRDS <- "./data/storm.rds"
 if (!file.exists(dataFile)) {
 	    download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", 
 		    dataFile, method = "curl", mode = "wb")
+        storm_df <- read.csv(bzfile(dataFile))
+        saveRDS(storm_df, dataRDS)
     } else if (!file.exists(dataRDS)) {
         storm_df <- read.csv(bzfile(dataFile))
         saveRDS(storm_df, dataRDS)
@@ -46,6 +48,7 @@ if (!file.exists(dataFile)) {
 if (exists("storm_df") == FALSE) {
     storm_df <- readRDS(dataRDS)
 }
+
 ```
 
 ## Results
