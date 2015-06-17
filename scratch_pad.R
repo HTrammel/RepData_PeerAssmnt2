@@ -1,6 +1,7 @@
 require(dplyr)
 require(ggplot2)
 require(lubridate)
+require(stringr)
 
 
 if(!file.exists("./data")) {dir.create("./data")}
@@ -23,7 +24,15 @@ if (exists("storm_df") == FALSE) {
     storm_df <- readRDS(dataRDS)
 }
 
-storm_df$BGN_DATE <- dmy(as.character(storm_df$BGN_DATE))
+sdf <- select(storm_df, one_of(c("BGN_DATE","EVTYPE","FATALITIES","INJURIES")))
+
+# general conversions to make things better
+sdf$EVTYPE <- str_to_title(as.character(sdf$EVTYPE))
+sdf$BGN_DATE <- as.character.Date(sdf$BGN_DATE)
+sdf$BGN_DATE <- dmy_hms(sdf$BGN_DATE)
 
 
-s_df <- storm_df %>% group_by(year(BGN_DATE), EVTYPE ) %>% summarise(mean(FATALITIES))
+evt_cnt <- sdf %>%
+    group_by(EVTYPE) %>%
+    summarise(cnt = n()) %>%
+    arrange(desc(cnt))
