@@ -42,3 +42,4 @@ sevt <- str_to_title(as.character(sevt))
 sdf <- tbl_df(cbind(sdf, sevt))
 
 #sdf <- data.frame(cbind(sdf, evtCat = eventCategory(sdf)))
+

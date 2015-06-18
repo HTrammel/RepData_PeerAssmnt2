@@ -36,3 +36,4 @@ evt_cnt <- sdf %>%
     group_by(EVTYPE) %>%
     summarise(cnt = n()) %>%
     arrange(desc(cnt))
+
