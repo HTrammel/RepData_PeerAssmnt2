@@ -31,7 +31,7 @@ if (exists("storm_df") == FALSE) {
     storm_df <- readRDS(dataRDS)
 }
 
-df <- select(storm_df, one_of(c("BGN_DATE", "STATE", "EVTYPE", "FATALITIES","INJURIES",
+df <- select(storm_df, one_of(c("BGN_DATE", "EVTYPE", "FATALITIES","INJURIES",
 "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")))
 
 # general conversions to make things better
@@ -46,12 +46,14 @@ df <- filter(df, FATALITIES > 0 | INJURIES > 0 | PROPDMG > 0 | CROPDMG > 0)
 # remove leading and laging spaces
 df$EVTYPE <- Trim(df$EVTYPE)
 
-# hail
-df$EVTYPE <- gsub("(Tstm|Thunderstorm|Thunderst[a-z]+)[ ]*(Wind|Winds|Wins)($|[ ]*[a-zA-Z0-9]+)", "Thunderstorm Wind", df$EVTYPE, fixed = TRUE)
-#df$EVTYPE <- gsub("^Flash Flood", "Flash Flood", df$EVTYPE)
+df$EVTYPE <- gsub("[a-zA-Z]+nado[es]*( F[0-9])*", "Tornado", df$EVTYPE)
+df$EVTYPE <- gsub("Hail([ ]*[0-9]*|[ ]*/[a-zA-Z]*)", "Hail", df$EVTYPE)
+df$EVTYPE <- gsub("Tstm", "Thunderstorm", df$EVTYPE, fixed = TRUE)
 
-# df$EVTYPE <- gsub("Tidal|Beach Fl[a-z]+", c("Coastal Flood"), df$EVTYPE)
-
+df$EVTYPE <- mgsub(c("Thunderstormw","Thunerstorm","Thunderstorms"
+                    ,"Thundertorm","Thundeerstorm"), "Thunderstorm"
+                    , df$EVTYPE, fixed = TRUE)
+df$EVTYPE <- mgsub(c("Wins","Wnd","Winds"), "Wind", df$EVTYPE)
 
 
 t <- sort(unique(df$EVTYPE))
