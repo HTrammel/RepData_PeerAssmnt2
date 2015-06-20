@@ -83,47 +83,6 @@ blzd <- c("Blizzard And Extreme Wind Chil", "Blizzard Weather"
 , "Heavy Snow/Blizzard", "Icestorm/Blizzard")
 df$EVTYPE <- mgsub(blzd, c("Blizzard"), df$EVTYPE)
 
-# debris flow
-dbfl <- c( "Landslide/Urban Flood", "Landslides", "Landslump"
-, "Mud Slide", "Mud Slides", "Mudslide", "Mudslide/Landslide", "Mudslides"
-, "Rock Slide", "Urban Flood Landslide","Landslide")
-df$EVTYPE <- mgsub(dbfl, c("Debris Flow"), df$EVTYPE)
-
-# Drought 
-drou <- c("Excessive Heat/Drought", "Drought/Excessive Heat"
-, "Heat Drought", "Heat Wave Drought", "Heat/Drought" 
-, "Dry Conditions", "Excessively Dry", "Dry Pattern"
-, "Dry Spell", "Dry Weather", "Dryness", "Abnormally Dry")
-#, "Dry")
-df$EVTYPE <- mgsub(drou, c("Drought"), df$EVTYPE)
-
-# dust devil
-df$EVTYPE <- mgsub(c("Dust Devel", "Dust Devil Waterspout"), c("Dust Devil"), df$EVTYPE)
-
-# dust storm 
-df$EVTYPE <- mgsub(c("Dust Storm/High Winds", "High Winds Dust Storm")
-	,c("Dust Storm"), df$EVTYPE)
-
-# dense fog 
-df$EVTYPE <- mgsub("Patchy Dense Fog", "Dense Fog", df$EVTYPE)
-
-# excessive heat 
-xheat<- c("Heat Wave", "Heat Waves", "Heatburst"
-, "Record Heat", "Record High", "Record High Temperature"
-, "Record High Temperatures", "Record/Excessive Heat", "Record Warmth")
-#, "Heat")
-df$EVTYPE <- mgsub(xheat, c("Excessive Heat"), df$EVTYPE)
-
-
-# flash flood
-ffld<- c("Flash Flood - Heavy Rain", "Flash Flood From Ice Jams" 
-, "Flash Flood Winds", "Flash Flood/ Street", "Flash Flood/Flood" 
-, "Flash Flood/Heavy Rain", "Flash Flood/Landslide"
-, "Flash Flooding", "Flash Flooding/Thunderstorm Wi"
-, "Flash Floods", "Flash Floooding", "Flood Flash" 
-, "Flood/Flash Flood", "Flood/Flash Flooding"
-, "Thunderstorm Winds/Flash Flood")
-df$EVTYPE <- mgsub(ffld, c("Flash Flood"), df$EVTYPE)
 
 # flood
 fld <- c("Breakup Flooding","Flood & Heavy Rain", "Flood/Rain/Wind" 

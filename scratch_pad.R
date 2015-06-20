@@ -50,7 +50,18 @@ df <- mutate (df, damage = (PROPDMG * damageUnit(PROPDMGEXP)) +
 
 # remove leading and laging spaces
 df$EVTYPE <- Trim(df$EVTYPE)
+df$EVTYPE <- Trim(df$EVTYPE)
 
+df$EVTYPE <- gsub("[a-zA-Z]+nado[es]*( F[0-9])*", "Tornado", df$EVTYPE)
+df$EVTYPE <- gsub("Hail([ ]*[0-9]*|[ ]*/[a-zA-Z]*)", "Hail", df$EVTYPE)
+df$EVTYPE <- gsub("Tstm", "Thunderstorm", df$EVTYPE, fixed = TRUE)
+df$EVTYPE <- gsub("[(]*[a-zA-Z]*[0-9]+([ ]*Mph)*[)]*", " ", df$EVTYPE)
+df$EVTYPE <- mgsub(c("Thunderstormw","Thunerstorm","Thunderstorms"
+                     ,"Thundertorm","Thundeerstorm")
+                   , c("Thunderstorm"), df$EVTYPE)
+df$EVTYPE <- mgsub(c("Wins","Wnd","Winds"), "Wind", df$EVTYPE)
+
+# try some plots
 th_df <- df %>% group_by(EVTYPE) %>%
     summarise(avg_effect = mean(humEffect)) %>%
     top_n(10, avg_effect) %>% arrange(desc(avg_effect))
