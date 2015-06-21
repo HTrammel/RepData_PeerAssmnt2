@@ -1,33 +1,27 @@
-The Economic and Health Impact of Severe Weather Events in the United States
-============================================================================
+The Economic and Health Impact of Severe Weather Events in the United States Over the Past Twenty Years
+=======================================================================================================
 Author: Harold L Trammel
-
-## Course Instructions
-Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
-
-This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
-
-### Assignment
-The basic goal of this assignment is to explore the NOAA Storm Database and answer some basic questions about severe weather events. You must use the database to answer the questions below and show the code for your entire analysis. Your analysis can consist of tables, figures, or other summaries. You may use any R package you want to support your analysis.
-
-### Questions
-
-Your data analysis must address the following questions:
-
-- Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
-- Across the United States, which types of events have the greatest economic consequences?
-
-Consider writing your report as if it were to be read by a government or municipal manager who might be responsible for preparing for severe weather events and will need to prioritize resources for different types of events. However, there is no need to make any specific recommendations in your report.
 
 ## Synopsis
 
+The U.S. National Oceanic and Atmospheric Administration (NOAA) collects storm-related data in their Storm Database.  These data are collected from a wide range of sources across the United States.  Two important facets of the data collected are health impact and economic impact. Data from this database were analyzed for for the past twenty years (1994-2014) with particular focus on health and economic impact of storms.
+
+Thunderstorm Winds were the most common storm event type over the twenty years.  This was also the most common cause of economic loss.  Over the twenty year period, thunderstrom winds accounted for more that 1 billon dollars in damages.  Tornados were the second most common cause of damages but the primary cause of human health effects.  Tornados were far more likely to cause human deaths and injuries than the other storm event types.  Flooding (flash floods and general flooding) caused almost as much damage as thunderstorm winds.  Thunderstorm related events (wind, lightening, and hail) combined appeared to be a common cause of both damaage and human effects.
 
 ## Data Processing
 
-```{r}
-library(dplyr)
-library(tidyr)
-library(lubridate)
+The first steps in this research were to:
+
+1. Download the provided Storm Database
+2. Clean and tidy the data needed for the desired analysis
+
+```{r getAndLoadData}
+require(plyr)
+require(dplyr)
+require(ggplot2)
+require(lubridate)
+require(stringr)
+require(qdap)
 
 if(!file.exists("./data")) {dir.create("./data")}
 fileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
@@ -40,13 +34,13 @@ if (!file.exists(dataFile)) {
         # needed for my Windows PC
         download.file(fileURL, destfile=dataFile)
     } else {
-        # needed for my Mac
+        # ne landeded for my Mac
         download.file(fileURL, destfile=dataFile, method = "curl", mode = "wb")
     }
-    storm_df <- read.csv(bzfile(dataFile))
+    storm_df <- read.csv(bzfile(dataFile), stringsAsFactors = FALSE)
     saveRDS(storm_df, dataRDS)
 } else if (!file.exists(dataRDS)) {
-    storm_df <- read.csv(bzfile(dataFile))
+    storm_df <- read.csv(bzfile(dataFile), stringsAsFactors = FALSE)
     saveRDS(storm_df, dataRDS)
 }
 
@@ -56,7 +50,244 @@ if (exists("storm_df") == FALSE) {
 }
 ```
 
+After reviewing the data structures and contents of the data provided, I decided to extract only the columns and rows needed for my analysis.  These were:
+
+* BGN_DATE
+* EVTYPE
+* FATALITIES
+* INJURIES
+* PROPDMG
+* PROPDMGEXP
+* CROPDMG
+* CROPDMGEXP
+
+```{r select_process}
+# select only the needed columns
+df <- select(storm_df, one_of(c("BGN_DATE", "EVTYPE", "FATALITIES","INJURIES",
+"PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")))
+# function to convert unit abbreviations to numeric values 
+damageUnit <- function (cv) {
+    for (i in cv) {
+        if (i == "B") { return (1000000000) }
+        else if (i == "M") { return (1000000) }
+        else if (i == "K") { return (1000) }
+        else return (1)
+    }
+}
+# general conversions to make things better
+df$EVTYPE <- str_to_title(as.character(df$EVTYPE))
+df$BGN_DATE <- as.character.Date(df$BGN_DATE)
+df$BGN_DATE <- dmy_hms(df$BGN_DATE)
+# filter for only past twenty years data
+df <- filter (df, year(df$BGN_DATE) >= 1994 & year(df$BGN_DATE) <= 2014 )
+# filter for only rows with human and economic impact
+df <- filter(df, FATALITIES > 0 | INJURIES > 0 | PROPDMG > 0 | CROPDMG > 0)
+# add new column to hold calculated values
+df <- mutate (df, humEffect = FATALITIES + INJURIES)
+df <- mutate (df, damage = (PROPDMG * damageUnit(PROPDMGEXP)) +
+                  (CROPDMG * damageUnit(CROPDMGEXP)))
+```
+
+Because the data were obtained from such a wide range of sources over the past 65 years, the EVTYPE values were frequently inconsistent.  As part of the preliminary analysis, I identified the most commonly occuring EVTYPE values for the past twenty years and then strived to make sure that these EVTYPE records were cleaned.
+
+
+```{r cleanAndTidy}
+# remove leading and laging spaces
+df$EVTYPE <- Trim(df$EVTYPE)
+
+# MISCELLANOUS ##########################################
+# Debris Flow
+df$EVTYPE <- gsub("[ a-zA-Z/]*[s]*[/]*slide", "Debris Flow", df$EVTYPE, ignore.case = T)
+# Dense Fog 
+df$EVTYPE <- gsub("[ a-zA-Z/]*[s]*[/]*Dense Fog", "Dense Fog", df$EVTYPE)
+# Dense Smoke [NO CHANGE]
+
+# WIND AND RAIN RELATED ######################################
+# Wind
+df$EVTYPE <- gsub("W[i]*n[s|d][s]*", "Wind", df$EVTYPE)
+df$EVTYPE <- gsub("Wind[ a-zA-Z/0-9\\(\\)\\.]*", "Wind", df$EVTYPE)
+# High Wind
+df$EVTYPE <- mgsub(c("Gradient Wind","Extreme Wind"
+                    ,"Storm Force Wind", "Strong Wind"
+                    ,"Gusty Wind")
+                  ,c("High Wind"), df$EVTYPE)
+# Thunderstorm Wind
+df$EVTYPE <- gsub("Tstm", "Thunderstorm", df$EVTYPE)
+df$EVTYPE <- gsub("T[h]*u[n]*[d]*e[e]*r[s]*t[or|ro]*m[s|w]*", "Thunderstorm", df$EVTYPE)
+df$EVTYPE <- gsub("[(]*[a-zA-Z]*[0-9]+([ ]*Mph)*[)]*", " ", df$EVTYPE)
+df$EVTYPE <- gsub("Thunderstorm Wind[\\. a-zA-Z/]*", "Thunderstorm Wind", df$EVTYPE)
+# Hail
+df$EVTYPE <- gsub("Hail([ ]*[0-9]*|[ ]*/[a-zA-Z]*)", "Hail", df$EVTYPE)
+df$EVTYPE <- gsub("[a-zA-Z /]*Hail", "Hail", df$EVTYPE)
+# Lightning
+df$EVTYPE <- gsub("Lightning[a-zA-Z/ \\.]*", "Lightning", df$EVTYPE)
+df$EVTYPE <- gsub("[a-zA-Z/ ]*Lightning", "Lightning", df$EVTYPE)
+# Heavy Rain
+df$EVTYPE <- gsub("[a-zA-Z ]*Rain/Winter Weather", "WW", df$EVTYPE)
+df$EVTYPE <- gsub("Heavy Rain[/a-zA-Z ]*)*", "Heavy Rain", df$EVTYPE)
+df$EVTYPE <- mgsub(c("Excessive Rainfall", "Unseasonal Rain")
+                 , c("Heavy Rain"), df$EVTYPE)
+
+# HEAT RELATED ################################################
+# Drought [NO CHANGE]
+df$EVTYPE <- gsub("Drought[-/a-zA-Z ]*", "Drought", df$EVTYPE)
+df$EVTYPE <- gsub("[/a-zA-Z ]*Drought", "Drought", df$EVTYPE)
+# Dust Devil
+df$EVTYPE <- gsub("Dust Devil Waterspout","Dust Devil", df$EVTYPE)
+# Dust Storm [NO CHANGE]
+# Excessive Heat 
+df$EVTYPE <- gsub("[ a-zA-Z/]* Heat", "Excessive Heat", df$EVTYPE)
+# Heat
+df$EVTYPE <- gsub("Heat [a-zA-Z/ ]+", "Heat", df$EVTYPE)
+
+# FLOOD RELATED ###############################################
+# Coastal Flooding
+df$EVTYPE <- gsub("(Coastal|Cstl|Tidal) Flood(ing)*", "CFLD", df$EVTYPE)
+df$EVTYPE <- gsub("[ a-zA-Z/]*[s]*[/]*Coastal Flood", "CFLD", df$EVTYPE)
+df$EVTYPE <- gsub("Coastal Flood[/]*[a-zA-A /]+", "CFLD", df$EVTYPE)
+# Flash flood
+df$EVTYPE <- mgsub(c("Flash Flood/Flood","Flood/Flash Flood"), "Flood", df$EVTYPE)
+df$EVTYPE <- gsub("Flash (Fl[o]+d)(s|ing)*", "FF", df$EVTYPE)
+df$EVTYPE <- gsub("Flash Flood[ a-zA-Z/]+", "FF", df$EVTYPE)
+df$EVTYPE <- gsub("[ a-zA-Z/]+Flash Flood", "FF", df$EVTYPE)
+# Flood
+df$EVTYPE <- gsub("Flood(s|in[g]*)*", "Flood", df$EVTYPE)
+df$EVTYPE <- gsub("Flood/*[ a-zA-Z/(&]*", "Flood", df$EVTYPE)
+df$EVTYPE <- gsub("Thunder[a-zA-Z/ ]+ Flood", "Flood", df$EVTYPE)
+df$EVTYPE <- gsub("[a-zA-Z/ ]+Flood", "Flood", df$EVTYPE)
+#---------------
+df$EVTYPE <- mgsub(c("CFLD","FF")
+                   ,c("Coastal Flood","Flash Flood"), df$EVTYPE)
+###############################################################
+
+# #### WINTER #############################################
+# Avalance
+df$EVTYPE <- gsub("([ a-zA-Z/]*)*Avalanche", "Avalanche", df$EVTYPE)
+# Blizzard
+df$EVTYPE <- gsub("Blizzard[-/a-zA-Z ]*", "Blizzard", df$EVTYPE)
+df$EVTYPE <- gsub("[/a-zA-Z ]*Blizzard", "Blizzard", df$EVTYPE)
+# Cold/Wind Chill
+df$EVTYPE <- mgsub(c("Fog And Cold","Cold/Wind Chill"
+                     ,"High Wind/Cold","Cold/Wind")
+                   , c("CWC"), df$EVTYPE)
+df$EVTYPE <- gsub("Un[a-zA-Z]+ Cold", "CWC", df$EVTYPE)
+df$EVTYPE <- gsub("Cold (Temp[a-z]+[s]*|Wave|Weather)+", "CWC", df$EVTYPE)
+df$EVTYPE <- gsub("Cold And[a-zA-Z /]+", "CWC", df$EVTYPE)
+df$EVTYPE <- gsub("Cold","CWC", df$EVTYPE)
+# Extreme Wind Chill <================
+df$EVTYPE <- gsub("Ext[a-z]* Cold/Wind Chill", "ECWC", df$EVTYPE)
+df$EVTYPE <- gsub("Record Cold/Wind Chill", "ECWC", df$EVTYPE)
+df$EVTYPE <- gsub("[/a-zA-Z ]*Extreme Cold", "ECWC", df$EVTYPE)
+df$EVTYPE <- gsub("[a-zA-Z ]*(Bitter|Extreme) Wind[ ]*[C|c]?h[a-zA-Z ]+", "ECWC", df$EVTYPE)
+#---------------
+df$EVTYPE <- mgsub(c("CWC","ECWC")
+                   , c("Cold/Wind Chill","Extreme Cold/Wind Chill"), df$EVTYPE)
+# Freezing fog 
+df$EVTYPE <- gsub("[ a-zA-Z/]*[s]*[/]*Freezing Fog", "FZFG", df$EVTYPE)
+# Freeze
+df$EVTYPE <- gsub("Frost/Freeze","FRZ", df$EVTYPE)
+df$EVTYPE <- gsub("(Agricultural|Damaging)*[ ]*Freeze","FRZ", df$EVTYPE)
+# Heavy Snow
+df$EVTYPE <- gsub("Heavy Snow[-/a-zA-Z ]*", "HSNO", df$EVTYPE)
+df$EVTYPE <- gsub("Snow/Heavy Snow", "HSNO", df$EVTYPE)
+# Winter Storm
+df$EVTYPE <- gsub("Snow[/]*[ ]*Freezing Rain", "WSTRM", df$EVTYPE)
+df$EVTYPE <- gsub("Freezing Rain[/]*[ ]*Snow", "WSTRM", df$EVTYPE)
+df$EVTYPE <- gsub("Mixed [ a-zA-Z]+", "WSTRM", df$EVTYPE)
+df$EVTYPE <- gsub("[a-zA-Z/ ]*Mix", "WSTRM", df$EVTYPE)
+df$EVTYPE <- mgsub(c("Snow/Sleet/Freezing Rain"
+                    ,"Snow And Ice","Snow/Ice Storm"
+                    ,"Falling Snow/Ice","Snow/Sleet"
+                    ,"Snow/ Bitter Cold/Wind Chill"
+                    ,"([ a-zA-Z]*[ ]*)*Rain/Snow","Snow/ Ice")
+                    , c("WSTRM"), df$EVTYPE)
+# Winter Weather
+df$EVTYPE <- gsub("Light Freezing Rain","WW", df$EVTYPE)
+df$EVTYPE <- gsub("Freezing [a-zA-Z/ ]","WW", df$EVTYPE)
+df$EVTYPE <- gsub("Snow[/a-zA-Z ]*","WW", df$EVTYPE)
+#-----------------
+df$EVTYPE <- gsub("FRZ", "Frost/Freeze", df$EVTYPE)
+df$EVTYPE <- gsub("FZFG", "Freezing Fog", df$EVTYPE)
+df$EVTYPE <- gsub("WW", "Winter Weather", df$EVTYPE)
+df$EVTYPE <- gsub("HSNO", "Heavy Snow", df$EVTYPE)
+df$EVTYPE <- gsub("WSTRM", "Winter Storm", df$EVTYPE)
+###############################################################
+
+# HERE WE GO ROUND IN CIRCLES
+# Hurricane/Typhoon
+df$EVTYPE <- gsub("Hurricane[a-zA-Z/ ]*", "HTPH", df$EVTYPE)
+df$EVTYPE <- gsub("Storm Surge[a-zA-Z/ ]*", "HTPH", df$EVTYPE)
+df$EVTYPE <- gsub("HTPH", "Hurricane/Typhoon", df$EVTYPE)
+# Funnel cloud
+df$EVTYPE <- gsub("Funnel Cloud[a-zA-Z/ ]*", "Funnel Cloud", df$EVTYPE)
+df$EVTYPE <- gsub("[a-zA-Z/ ]*Funnel Cloud", "Funnel Cloud", df$EVTYPE)
+# Tornado
+df$EVTYPE <- gsub("Tornado[es]*( F[0-9])*", "Tornado", df$EVTYPE)
+# Tropical Storm
+df$EVTYPE <- gsub("Tropical Storm[ a-zA-Z]*", "Tropical Storm", df$EVTYPE)
+
+df$EVTYPE <- Trim(df$EVTYPE)
+```
+
 ## Results
 
+```{r results}
+t <- df %>% 
+    group_by(EVTYPE) %>% 
+    count(EVTYPE) %>% 
+    arrange(desc(n)) %>% 
+    top_n(10, n)
+tevt <- t$EV
+
+ev_df <- df %>% 
+    filter(EVTYPE %in% tevt) %>%
+    group_by(year(BGN_DATE), EVTYPE) %>%
+    summarise(num_evt = n()) %>% 
+    arrange(desc(num_evt)) %>%
+    top_n(10, num_evt)  
+
+names(ev_df) <- c("year", "eventType", "num_evt")
+hp0 <- ggplot(ev_df, aes(eventType, num_evt, fill = year)) +
+    geom_bar(stat = 'identity', position = 'stack') + 
+    coord_flip() +
+    scale_fill_continuous(name = "Year") +
+    labs (title = "Most Frequent Storm Events"
+          , x = "Storm Event Type"
+          , y = "Number of Events")
+print(hp0)
+
+th_df <- df %>% 
+    filter(EVTYPE %in% tevt) %>%
+    group_by(year(BGN_DATE), EVTYPE) %>%
+    summarise(sum_effect = sum(humEffect)) %>% 
+    arrange(desc(sum_effect)) %>%
+    top_n(10, sum_effect)  
+
+names(th_df) <- c("year", "eventType", "sum_effect")
+hp1 <- ggplot(th_df, aes(eventType, sum_effect, fill = year)) +
+    geom_bar(stat = 'identity', position = 'stack') + 
+    coord_flip() +
+    scale_fill_continuous(name = "Year") +
+    labs (title = "Human Effects (Fatalities + Injuries) from Storms"
+          , x = "Storm Event Type"
+          , y = "Number of Fatalities and Injuries")
+print(hp1)
 
 
+td_df <- df %>% 
+    filter(EVTYPE %in% tevt) %>%
+    group_by(year(BGN_DATE),EVTYPE) %>%
+    summarise(sum_damage = sum(damage)) %>% 
+    arrange(desc(sum_damage)) %>%
+    top_n(10, sum_damage)
+names(td_df) <- c("year", "eventType", "sum_damage")
+
+hp2 <- ggplot(td_df, aes(eventType, sum_damage/1000000, fill = year)) +
+    geom_bar(stat = 'identity', position = 'stack') + 
+    coord_flip() +
+    scale_fill_continuous(name = "Year") +
+    labs (title = "Storm Damage (Property + Crop)"
+          , x = "Storm Event Type"
+          , y = "Damage in Dollars (Millions)")
+print(hp2)
+```
